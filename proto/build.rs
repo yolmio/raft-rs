@@ -1,12 +1,14 @@
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
 
-use protobuf_build::Builder;
+use std::io::Result;
 
-fn main() {
+fn main() -> Result<()> {
     let base = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    Builder::new()
-        .search_dir_for_protos(&format!("{}/proto", base))
-        .includes(&[format!("{}/include", base), format!("{}/proto", base)])
-        .include_google_protos()
-        .generate()
+    let proto_path = format!("{}/proto", base);
+
+    prost_build::Config::new()
+        .bytes(["."])
+        .compile_protos(&[format!("{}/eraftpb.proto", proto_path)], &[proto_path])?;
+
+    Ok(())
 }

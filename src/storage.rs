@@ -523,7 +523,7 @@ impl Storage for MemStorage {
 mod test {
     use std::panic::{self, AssertUnwindSafe};
 
-    use protobuf::Message as PbMessage;
+    use prost::Message as ProstMessage;
 
     use crate::eraftpb::{ConfState, Entry, Snapshot};
     use crate::errors::{Error as RaftError, StorageError};
@@ -537,8 +537,8 @@ mod test {
         e
     }
 
-    fn size_of<T: PbMessage>(m: &T) -> u32 {
-        m.compute_size()
+    fn size_of<T: ProstMessage>(m: &T) -> u32 {
+        m.encoded_len() as u32
     }
 
     fn new_snapshot(index: u64, term: u64, voters: Vec<u64>) -> Snapshot {

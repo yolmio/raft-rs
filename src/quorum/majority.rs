@@ -17,10 +17,12 @@ pub struct Configuration {
 
 impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut sorted: Vec<_> = self.voters.iter().copied().collect();
+        sorted.sort_unstable();
         write!(
             f,
             "({})",
-            self.voters
+            sorted
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<String>>()

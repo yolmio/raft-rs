@@ -22,9 +22,9 @@ pub enum Error {
     /// The configuration is invalid.
     #[error("{0}")]
     ConfigInvalid(String),
-    /// A protobuf message codec failed in some manner.
-    #[error("protobuf codec error {0:?}")]
-    CodecError(#[from] protobuf::ProtobufError),
+    /// A prost message codec failed in some manner.
+    #[error("prost codec error {0:?}")]
+    CodecError(#[from] prost::DecodeError),
     /// The node exists, but should not.
     #[error("The node {id} already exists in the {set} set.")]
     Exists {

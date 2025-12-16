@@ -19,7 +19,6 @@ use std::collections::HashMap;
 use std::panic::{self, AssertUnwindSafe};
 
 use harness::*;
-use protobuf::Message as PbMessage;
 use raft::eraftpb::*;
 use raft::storage::MemStorage;
 use raft::*;
@@ -29,7 +28,7 @@ use slog::Logger;
 use crate::integration_cases::test_raft_paper::commit_noop_entry;
 use crate::test_util::*;
 
-type HashSet<K> = std::collections::HashSet<K, std::hash::BuildHasherDefault<fxhash::FxHasher>>;
+type HashSet<K> = std::collections::HashSet<K, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
 
 fn read_messages<T: Storage>(raft: &mut Raft<T>) -> Vec<Message> {
     raft.msgs.drain(..).collect()
@@ -357,7 +356,7 @@ fn test_progress_paused() {
     m.set_msg_type(MessageType::MsgPropose);
     let mut e = Entry::default();
     e.data = (b"some_data" as &'static [u8]).into();
-    m.entries = vec![e].into();
+    m.entries = vec![e];
     raft.step(m.clone()).expect("");
     raft.step(m.clone()).expect("");
     raft.step(m).expect("");
@@ -397,7 +396,7 @@ fn test_progress_flow_control() {
     // election, and the first proposal (only one proposal gets sent
     // because we're in probe state).
     assert_eq!(ms.len(), 1);
-    assert_eq!(ms[0].msg_type, MessageType::MsgAppend);
+    assert_eq!(ms[0].get_msg_type(), MessageType::MsgAppend);
     assert_eq!(ms[0].entries.len(), 2);
     assert_eq!(ms[0].entries[0].data.len(), 0);
     assert_eq!(ms[0].entries[1].data.len(), 1000);
@@ -410,7 +409,7 @@ fn test_progress_flow_control() {
     ms = r.read_messages();
     assert_eq!(ms.len(), 3);
     for (i, m) in ms.iter().enumerate() {
-        if m.msg_type != MessageType::MsgAppend {
+        if m.get_msg_type() != MessageType::MsgAppend {
             panic!("{}: expected MsgAppend, got {:?}", i, m.msg_type);
         }
         if m.entries.len() != 2 {
@@ -426,7 +425,7 @@ fn test_progress_flow_control() {
     ms = r.read_messages();
     assert_eq!(ms.len(), 2);
     for (i, m) in ms.iter().enumerate() {
-        if m.msg_type != MessageType::MsgAppend {
+        if m.get_msg_type() != MessageType::MsgAppend {
             panic!("{}: expected MsgAppend, got {:?}", i, m.msg_type);
         }
     }
@@ -763,8 +762,7 @@ fn test_vote_from_any_state_for_type(vt: MessageType, l: &Logger) {
 #[test]
 fn test_log_replication() {
     let l = default_logger();
-    let mut tests = vec![
-        (
+    let mut tests = [(
             Network::new(vec![None, None, None], &l),
             vec![new_message(1, 1, MessageType::MsgPropose, 1)],
             2,
@@ -777,8 +775,7 @@ fn test_log_replication() {
                 new_message(1, 2, MessageType::MsgPropose, 1),
             ],
             4,
-        ),
-    ];
+        )];
 
     for (i, &mut (ref mut network, ref msgs, wcommitted)) in tests.iter_mut().enumerate() {
         network.send(vec![new_message(1, 1, MessageType::MsgHup, 0)]);
@@ -1006,7 +1003,7 @@ fn test_candidate_concede() {
     // send a proposal to 3 to flush out a MsgAppend to 1
     let data = "force follower";
     let mut m = new_message(3, 3, MessageType::MsgPropose, 0);
-    m.entries = vec![new_entry(0, 0, Some(data))].into();
+    m.entries = vec![new_entry(0, 0, Some(data))];
     tt.send(vec![m]);
     // send heartbeat; flush out commit
     tt.send(vec![new_message(3, 3, MessageType::MsgBeat, 0)]);
@@ -1052,7 +1049,7 @@ fn test_old_messages() {
     // pretend we're an old leader trying to make progress; this entry is expected to be ignored.
     let mut m = new_message(2, 1, MessageType::MsgAppend, 0);
     m.term = 2;
-    m.entries = vec![empty_entry(2, 3)].into();
+    m.entries = vec![empty_entry(2, 3)];
     tt.send(vec![m]);
     // commit a new entry
     tt.send(vec![new_message(1, 1, MessageType::MsgPropose, 1)]);
@@ -1115,10 +1112,8 @@ fn test_proposal() {
 #[test]
 fn test_proposal_by_proxy() {
     let l = default_logger();
-    let mut tests = vec![
-        Network::new(vec![None, None, None], &l),
-        Network::new(vec![None, None, NOP_STEPPER], &l),
-    ];
+    let mut tests = [Network::new(vec![None, None, None], &l),
+        Network::new(vec![None, None, NOP_STEPPER], &l)];
     for (j, tt) in tests.iter_mut().enumerate() {
         // promote 0 the leader
         tt.send(vec![new_message(1, 1, MessageType::MsgHup, 0)]);
@@ -1503,7 +1498,7 @@ fn test_msg_append_response_wait_reset() {
 
     // A new command is now proposed on node 1.
     m = new_message(1, 0, MessageType::MsgPropose, 0);
-    m.entries = vec![empty_entry(0, 0)].into();
+    m.entries = vec![empty_entry(0, 0)];
     sm.step(m).expect("");
     sm.persist();
 
@@ -4458,7 +4453,7 @@ fn test_conf_change_check_before_campaign() {
     let mut cc = ConfChange::default();
     cc.set_change_type(ConfChangeType::RemoveNode);
     cc.node_id = 3;
-    e.data = protobuf::Message::write_to_bytes(&cc).unwrap().into();
+    e.data = cc.write_to_bytes().unwrap().into();
     m.mut_entries().push(e);
     nt.send(vec![m]);
 
@@ -5396,7 +5391,7 @@ fn test_read_when_quorum_becomes_less() {
     m.set_msg_type(MessageType::MsgReadIndex);
     let mut e = Entry::default();
     e.data = (b"abcdefg" as &'static [u8]).into();
-    m.set_entries(vec![e].into());
+    m.set_entries(vec![e]);
     network.dispatch(vec![m]).unwrap();
 
     // Broadcast heartbeats.

@@ -21,7 +21,7 @@ use crate::eraftpb::{
     ConfChange, ConfChangeV2, ConfState, Entry, EntryType, HardState, Message, MessageType,
     Snapshot,
 };
-use protobuf::Message as _;
+use prost::Message as _;
 use raft_proto::ConfChangeI;
 use rand::Rng;
 use slog::Logger;
@@ -2082,20 +2082,24 @@ impl<T: Storage> Raft<T> {
                 }
 
                 for (i, e) in m.mut_entries().iter_mut().enumerate() {
-                    let mut cc;
+                    let cc;
                     if e.get_entry_type() == EntryType::EntryConfChange {
-                        let mut cc_v1 = ConfChange::default();
-                        if let Err(e) = cc_v1.merge_from_bytes(e.get_data()) {
-                            error!(self.logger, "invalid confchange"; "error" => ?e);
-                            return Err(Error::ProposalDropped);
-                        }
+                        let cc_v1 = match ConfChange::decode(e.get_data()) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                error!(self.logger, "invalid confchange"; "error" => ?e);
+                                return Err(Error::ProposalDropped);
+                            }
+                        };
                         cc = cc_v1.into_v2();
                     } else if e.get_entry_type() == EntryType::EntryConfChangeV2 {
-                        cc = ConfChangeV2::default();
-                        if let Err(e) = cc.merge_from_bytes(e.get_data()) {
-                            error!(self.logger, "invalid confchangev2"; "error" => ?e);
-                            return Err(Error::ProposalDropped);
-                        }
+                        cc = match ConfChangeV2::decode(e.get_data()) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                error!(self.logger, "invalid confchangev2"; "error" => ?e);
+                                return Err(Error::ProposalDropped);
+                            }
+                        };
                     } else {
                         continue;
                     }
@@ -2854,7 +2858,7 @@ impl<T: Storage> Raft<T> {
     pub fn reset_randomized_election_timeout(&mut self) {
         let prev_timeout = self.randomized_election_timeout;
         let timeout =
-            rand::thread_rng().gen_range(self.min_election_timeout..self.max_election_timeout);
+            rand::rng().random_range(self.min_election_timeout..self.max_election_timeout);
         debug!(
             self.logger,
             "reset election timeout {prev_timeout} -> {timeout} at {election_elapsed}",

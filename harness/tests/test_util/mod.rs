@@ -111,12 +111,7 @@ pub fn new_test_raft_with_config(config: &Config, storage: MemStorage, l: &Logge
 }
 
 pub fn hard_state(term: u64, commit: u64, vote: u64) -> HardState {
-    HardState {
-        term,
-        vote,
-        commit,
-        ..Default::default()
-    }
+    HardState { term, vote, commit }
 }
 
 pub fn soft_state(leader_id: u64, raft_state: StateRole) -> SoftState {
@@ -130,13 +125,13 @@ pub const SOME_DATA: Option<&'static str> = Some("somedata");
 
 pub fn new_message_with_entries(from: u64, to: u64, ty: MessageType, ents: Vec<Entry>) -> Message {
     let mut m = Message {
-        msg_type: ty,
+        msg_type: ty.into(),
         to,
         from,
         ..Default::default()
     };
     if !ents.is_empty() {
-        m.entries = ents.into();
+        m.entries = ents;
     }
     m
 }
@@ -148,7 +143,7 @@ pub fn new_message(from: u64, to: u64, t: MessageType, n: usize) -> Message {
         for _ in 0..n {
             ents.push(new_entry(0, 0, SOME_DATA));
         }
-        m.entries = ents.into();
+        m.entries = ents;
     }
     m
 }
@@ -179,7 +174,7 @@ pub fn new_snapshot(index: u64, term: u64, voters: Vec<u64>) -> Snapshot {
 
 pub fn conf_change(ty: ConfChangeType, node_id: u64) -> ConfChange {
     ConfChange {
-        change_type: ty,
+        change_type: ty.into(),
         node_id,
         ..Default::default()
     }
@@ -221,6 +216,6 @@ pub fn conf_state_v2(
 
 pub fn conf_change_v2(steps: Vec<ConfChangeSingle>) -> ConfChangeV2 {
     let mut cc = ConfChangeV2::default();
-    cc.set_changes(steps.into());
+    cc.set_changes(steps);
     cc
 }

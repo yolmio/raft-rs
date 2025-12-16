@@ -15,7 +15,7 @@
 // limitations under the License.
 
 use harness::Network;
-use protobuf::{Message as PbMessage, ProtobufEnum as _};
+use prost::Message as ProstMessage;
 use raft::eraftpb::*;
 use raft::storage::MemStorage;
 use raft::*;
@@ -91,7 +91,28 @@ fn new_raw_node_with_config(
 #[test]
 fn test_raw_node_step() {
     let l = default_logger();
-    for msg_t in MessageType::values() {
+    const ALL_MESSAGE_TYPES: [MessageType; 19] = [
+        MessageType::MsgHup,
+        MessageType::MsgBeat,
+        MessageType::MsgPropose,
+        MessageType::MsgAppend,
+        MessageType::MsgAppendResponse,
+        MessageType::MsgRequestVote,
+        MessageType::MsgRequestVoteResponse,
+        MessageType::MsgSnapshot,
+        MessageType::MsgHeartbeat,
+        MessageType::MsgHeartbeatResponse,
+        MessageType::MsgUnreachable,
+        MessageType::MsgSnapStatus,
+        MessageType::MsgCheckQuorum,
+        MessageType::MsgTransferLeader,
+        MessageType::MsgTimeoutNow,
+        MessageType::MsgReadIndex,
+        MessageType::MsgReadIndexResp,
+        MessageType::MsgRequestPreVote,
+        MessageType::MsgRequestPreVoteResponse,
+    ];
+    for msg_t in ALL_MESSAGE_TYPES {
         let s = new_storage();
         s.wl().set_hardstate(hard_state(1, 1, 0));
         // Append an empty entry to make sure the non-local messages (like
@@ -100,9 +121,9 @@ fn test_raw_node_step() {
         s.wl().apply_snapshot(new_snapshot(1, 1, vec![1])).unwrap();
 
         let mut raw_node = new_raw_node(1, vec![1], 10, 1, new_storage(), &l);
-        let res = raw_node.step(new_message(0, 0, *msg_t, 0));
+        let res = raw_node.step(new_message(0, 0, msg_t, 0));
         // LocalMsg should be ignored.
-        if raw_node::is_local_msg(*msg_t) {
+        if raw_node::is_local_msg(msg_t) {
             assert_eq!(res, Err(Error::StepLocalMsg), "{:?}", msg_t);
         }
     }
@@ -835,7 +856,7 @@ fn test_bounded_uncommitted_entries_growth_with_partition() {
     raw_node.campaign().unwrap();
     loop {
         let rd = raw_node.ready();
-        s.wl().set_hardstate(rd.hs().unwrap().clone());
+        s.wl().set_hardstate(*rd.hs().unwrap());
         s.wl().append(rd.entries()).unwrap();
         if rd
             .ss()
@@ -887,7 +908,7 @@ fn prepare_async_entries(raw_node: &mut RawNode<MemStorage>, s: &MemStorage) {
     // election, and the first proposal (only one proposal gets sent
     // because we're in probe state).
     assert_eq!(msgs.len(), 1);
-    assert_eq!(msgs[0].msg_type, MessageType::MsgAppend);
+    assert_eq!(msgs[0].get_msg_type(), MessageType::MsgAppend);
     assert_eq!(msgs[0].entries.len(), 2);
     let _ = raw_node.advance_append(rd);
 
@@ -928,7 +949,7 @@ fn test_raw_node_with_async_entries() {
     s.wl().append(&entries).unwrap();
     let msgs = rd.messages();
     assert_eq!(msgs.len(), 5);
-    assert_eq!(msgs[0].msg_type, MessageType::MsgAppend);
+    assert_eq!(msgs[0].get_msg_type(), MessageType::MsgAppend);
     assert_eq!(msgs[0].entries.len(), 2);
     let _ = raw_node.advance_append(rd);
 }
@@ -969,7 +990,7 @@ fn test_raw_node_with_async_entries_on_follower() {
 
     // Set recent inactive to step down leader
     raw_node.raft.mut_prs().get_mut(2).unwrap().recent_active = false;
-    let mut msg = Message::new();
+    let mut msg = Message::default();
     msg.set_to(1);
     msg.set_msg_type(MessageType::MsgCheckQuorum);
     raw_node.raft.step(msg).unwrap();
@@ -1014,7 +1035,7 @@ fn test_raw_node_async_entries_with_leader_change() {
     // election, and the first proposal (only one proposal gets sent
     // because we're in probe state).
     assert_eq!(msgs.len(), 1);
-    assert_eq!(msgs[0].msg_type, MessageType::MsgAppend);
+    assert_eq!(msgs[0].get_msg_type(), MessageType::MsgAppend);
     assert_eq!(msgs[0].entries.len(), 2);
     let _ = raw_node.advance_append(rd);
 
@@ -1122,7 +1143,7 @@ fn test_raw_node_entries_after_snapshot() {
         false,
         true,
     );
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
     s.wl().append(rd.entries()).unwrap();
     let light_rd = raw_node.advance(rd);
     assert_eq!(light_rd.commit_index(), None);
@@ -1164,7 +1185,7 @@ fn test_raw_node_entries_after_snapshot() {
         rd.persisted_messages()[0].get_msg_type(),
         MessageType::MsgAppendResponse
     );
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
     s.wl().apply_snapshot(rd.snapshot().clone()).unwrap();
     s.wl().append(rd.entries()).unwrap();
 
@@ -1215,7 +1236,7 @@ fn test_raw_node_overwrite_entries() {
         rd.persisted_messages()[0].get_msg_type(),
         MessageType::MsgAppendResponse
     );
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
     s.wl().append(rd.entries()).unwrap();
 
     let light_rd = raw_node.advance(rd);
@@ -1252,7 +1273,7 @@ fn test_raw_node_overwrite_entries() {
         rd.persisted_messages()[0].get_msg_type(),
         MessageType::MsgAppendResponse
     );
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
     s.wl().append(rd.entries()).unwrap();
 
     let light_rd = raw_node.advance(rd);
@@ -1343,7 +1364,7 @@ fn test_async_ready_leader() {
         first_index + 30
     );
     assert!(!rd.messages().is_empty());
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
     raw_node.advance_append_async(rd);
 
     // Forward commit index due to persist ready
@@ -1360,7 +1381,7 @@ fn test_async_ready_leader() {
     );
     assert!(!rd.messages().is_empty());
     assert!(rd.persisted_messages().is_empty());
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
 
     // Forward commit index due to persist last ready
     let light_rd = raw_node.advance_append(rd);
@@ -1482,7 +1503,7 @@ fn test_async_ready_follower() {
                 MessageType::MsgAppendResponse
             );
 
-            s.wl().set_hardstate(rd.hs().unwrap().clone());
+            s.wl().set_hardstate(*rd.hs().unwrap());
             s.wl().append(rd.entries()).unwrap();
             raw_node.advance_append_async(rd);
         }
@@ -1537,7 +1558,7 @@ fn test_async_ready_follower() {
         true,
     );
 
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
     s.wl().apply_snapshot(snapshot).unwrap();
     s.wl().append(rd.entries()).unwrap();
     raw_node.advance_append_async(rd);
@@ -1566,7 +1587,7 @@ fn test_async_ready_follower() {
         false,
         true,
     );
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
     s.wl().append(rd.entries()).unwrap();
     raw_node.advance_append_async(rd);
 
@@ -1617,7 +1638,7 @@ fn test_async_ready_become_leader() {
         false,
         true,
     );
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
 
     for msg in rd.persisted_messages() {
         assert_eq!(msg.get_msg_type(), MessageType::MsgRequestVote);
@@ -1733,7 +1754,7 @@ fn test_async_ready_multiple_snapshot() {
         false,
         true,
     );
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
     s.wl().apply_snapshot(rd.snapshot().clone()).unwrap();
     s.wl().append(rd.entries()).unwrap();
 
@@ -1764,7 +1785,7 @@ fn test_async_ready_multiple_snapshot() {
         false,
         true,
     );
-    s.wl().set_hardstate(rd.hs().unwrap().clone());
+    s.wl().set_hardstate(*rd.hs().unwrap());
     s.wl().apply_snapshot(rd.snapshot().clone()).unwrap();
 
     let light_rd = raw_node.advance_append(rd);
@@ -1846,7 +1867,7 @@ fn test_committed_entries_pagination_after_restart() {
     let (mut entries, mut size) = (vec![], 0);
     for i in 2..=10 {
         let e = new_entry(1, i, Some("test data"));
-        size += e.compute_size() as u64;
+        size += e.encoded_len() as u64;
         entries.push(e);
     }
     s.inner.wl().append(&entries).unwrap();

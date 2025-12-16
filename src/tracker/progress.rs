@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn test_progress_become_probe() {
         let matched = 1u64;
-        let mut tests = vec![
+        let mut tests = [
             (
                 new_progress(ProgressState::Replicate, matched, 5, 0, 256),
                 2,

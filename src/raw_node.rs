@@ -22,7 +22,7 @@
 
 use std::{collections::VecDeque, mem};
 
-use protobuf::Message as PbMessage;
+use prost::Message as ProstMessage;
 use raft_proto::ConfChangeI;
 use slog::Logger;
 
@@ -377,9 +377,9 @@ impl<T: Storage> RawNode<T> {
     /// leaving joint state.
     pub fn propose_conf_change(&mut self, context: Vec<u8>, cc: impl ConfChangeI) -> Result<()> {
         let (data, ty) = if let Some(cc) = cc.as_v1() {
-            (cc.write_to_bytes()?, EntryType::EntryConfChange)
+            (cc.encode_to_vec(), EntryType::EntryConfChange)
         } else {
-            (cc.as_v2().write_to_bytes()?, EntryType::EntryConfChangeV2)
+            (cc.as_v2().encode_to_vec(), EntryType::EntryConfChangeV2)
         };
         let mut m = Message::default();
         m.set_msg_type(MessageType::MsgPropose);
@@ -387,7 +387,7 @@ impl<T: Storage> RawNode<T> {
         e.set_entry_type(ty);
         e.data = data.into();
         e.context = context.into();
-        m.set_entries(vec![e].into());
+        m.set_entries(vec![e]);
         self.raft.step(m)
     }
 

@@ -10,7 +10,7 @@ use slog::{OwnedKVList, Record, KV};
 
 use crate::eraftpb::{Entry, Message};
 use crate::HashSet;
-use protobuf::Message as PbMessage;
+use prost::Message as ProstMessage;
 
 use slog::{b, record_static};
 
@@ -48,7 +48,7 @@ pub const NO_LIMIT: u64 = u64::MAX;
 /// limit_size(&mut entries, Some(0));
 /// assert_eq!(entries.len(), 1);
 /// ```
-pub fn limit_size<T: PbMessage + Clone>(entries: &mut Vec<T>, max: Option<u64>) {
+pub fn limit_size<T: ProstMessage + Clone>(entries: &mut Vec<T>, max: Option<u64>) {
     if entries.len() <= 1 {
         return;
     }
@@ -62,10 +62,10 @@ pub fn limit_size<T: PbMessage + Clone>(entries: &mut Vec<T>, max: Option<u64>) 
         .iter()
         .take_while(|&e| {
             if size == 0 {
-                size += u64::from(e.compute_size());
+                size += e.encoded_len() as u64;
                 return true;
             }
-            size += u64::from(e.compute_size());
+            size += e.encoded_len() as u64;
             size <= max
         })
         .count();

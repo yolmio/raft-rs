@@ -729,7 +729,7 @@ mod test {
         panic::{self, AssertUnwindSafe},
     };
 
-    use protobuf::Message as PbMessage;
+    use prost::Message as ProstMessage;
 
     use crate::config::Config;
     use crate::default_logger;
@@ -845,7 +845,7 @@ mod test {
     fn test_append() {
         let l = default_logger();
         let previous_ents = vec![new_entry(1, 1), new_entry(2, 2)];
-        let tests = vec![
+        let tests = [
             (vec![], 2, vec![new_entry(1, 1), new_entry(2, 2)], 3),
             (
                 vec![new_entry(3, 2)],
@@ -1309,7 +1309,7 @@ mod test {
         let (last, half) = (offset + num, offset + num / 2);
         let halfe = new_entry(half, half);
 
-        let halfe_size = u64::from(halfe.compute_size());
+        let halfe_size = halfe.encoded_len() as u64;
 
         let store = MemStorage::new();
         store
@@ -1438,7 +1438,7 @@ mod test {
     fn ents_size(ents: &[eraftpb::Entry]) -> u64 {
         let mut size = 0;
         for ent in ents {
-            size += ent.compute_size() as u64;
+            size += ent.encoded_len() as u64;
         }
         size
     }

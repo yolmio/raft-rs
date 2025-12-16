@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::{str, thread};
 
-use protobuf::Message as PbMessage;
+use prost::Message as ProstMessage;
 use raft::storage::MemStorage;
 use raft::{prelude::*, StateRole};
 use regex::Regex;
@@ -288,8 +288,7 @@ fn on_ready(
                 }
                 if let EntryType::EntryConfChange = entry.get_entry_type() {
                     // For conf change messages, make them effective.
-                    let mut cc = ConfChange::default();
-                    cc.merge_from_bytes(&entry.data).unwrap();
+                    let cc = ConfChange::decode(&entry.data[..]).unwrap();
                     let cs = rn.apply_conf_change(&cc).unwrap();
                     store.wl().set_conf_state(cs);
                 } else {
