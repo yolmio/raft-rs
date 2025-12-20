@@ -10,7 +10,7 @@ homepage = "https://github.com/yolmio/raft-rs"
 documentation = "https://docs.rs/raft"
 description = "The rust language implementation of Raft algorithm."
 categories = ["algorithms", "database-implementations"]
-edition = "2021"
+edition = "2024"
 
 [workspace]
 members = ["proto", "harness", "datadriven"]
