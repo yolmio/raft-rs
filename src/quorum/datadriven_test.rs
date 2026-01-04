@@ -203,44 +203,44 @@ fn test_quorum(data: &TestData) -> String {
                 // If the committed index was definitely above the currently inspected idx,
                 // the result shouldn't change if we lower it further.
                 for &id in c.ids() {
-                    if let Some(iidx) = l.acked_index(id) {
-                        if idx.0 > iidx.index {
-                            // try index - 1
-                            l.insert(
-                                id,
-                                Index {
-                                    index: iidx.index - 1,
-                                    group_id: iidx.group_id,
-                                },
-                            );
+                    if let Some(iidx) = l.acked_index(id)
+                        && idx.0 > iidx.index
+                    {
+                        // try index - 1
+                        l.insert(
+                            id,
+                            Index {
+                                index: iidx.index - 1,
+                                group_id: iidx.group_id,
+                            },
+                        );
 
-                            let a_idx = c.committed_index(use_group_commit, &l);
-                            if a_idx != idx {
-                                writeln!(
-                                    buf,
-                                    "{} <-- overlaying {}->{}",
-                                    a_idx.0,
-                                    id,
-                                    iidx.index - 1
-                                )
-                                .unwrap();
-                            }
-                            // try 0
-                            l.insert(
+                        let a_idx = c.committed_index(use_group_commit, &l);
+                        if a_idx != idx {
+                            writeln!(
+                                buf,
+                                "{} <-- overlaying {}->{}",
+                                a_idx.0,
                                 id,
-                                Index {
-                                    index: 0,
-                                    group_id: iidx.group_id,
-                                },
-                            );
-
-                            let a_idx = c.committed_index(use_group_commit, &l);
-                            if a_idx != idx {
-                                writeln!(buf, "{} <-- overlaying {}->{}", a_idx.0, id, 0).unwrap();
-                            }
-                            // recovery
-                            l.insert(id, iidx);
+                                iidx.index - 1
+                            )
+                            .unwrap();
                         }
+                        // try 0
+                        l.insert(
+                            id,
+                            Index {
+                                index: 0,
+                                group_id: iidx.group_id,
+                            },
+                        );
+
+                        let a_idx = c.committed_index(use_group_commit, &l);
+                        if a_idx != idx {
+                            writeln!(buf, "{} <-- overlaying {}->{}", a_idx.0, id, 0).unwrap();
+                        }
+                        // recovery
+                        l.insert(id, iidx);
                     }
                 }
             }

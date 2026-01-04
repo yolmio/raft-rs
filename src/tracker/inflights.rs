@@ -142,12 +142,12 @@ impl Inflights {
         self.count -= i;
         self.start = idx;
 
-        if self.count == 0 {
-            if let Some(incoming_cap) = self.incoming_cap.take() {
-                self.start = 0;
-                self.cap = incoming_cap;
-                self.buffer = Vec::with_capacity(self.cap);
-            }
+        if self.count == 0
+            && let Some(incoming_cap) = self.incoming_cap.take()
+        {
+            self.start = 0;
+            self.cap = incoming_cap;
+            self.buffer = Vec::with_capacity(self.cap);
         }
     }
 

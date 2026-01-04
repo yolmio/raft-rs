@@ -54,10 +54,10 @@ impl PartialEq for Error {
         match (self, other) {
             (Error::StepPeerNotFound, Error::StepPeerNotFound) => true,
             (Error::ProposalDropped, Error::ProposalDropped) => true,
-            (Error::Store(ref e1), Error::Store(ref e2)) => e1 == e2,
-            (Error::Io(ref e1), Error::Io(ref e2)) => e1.kind() == e2.kind(),
+            (Error::Store(e1), Error::Store(e2)) => e1 == e2,
+            (Error::Io(e1), Error::Io(e2)) => e1.kind() == e2.kind(),
             (Error::StepLocalMsg, Error::StepLocalMsg) => true,
-            (Error::ConfigInvalid(ref e1), Error::ConfigInvalid(ref e2)) => e1 == e2,
+            (Error::ConfigInvalid(e1), Error::ConfigInvalid(e2)) => e1 == e2,
             (Error::RequestSnapshotDropped, Error::RequestSnapshotDropped) => true,
             (Error::ConfChangeError(e1), Error::ConfChangeError(e2)) => e1 == e2,
             _ => false,

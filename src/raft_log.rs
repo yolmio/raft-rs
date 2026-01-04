@@ -486,10 +486,10 @@ impl<T: Storage> RaftLog<T> {
 
     /// Returns the current snapshot
     pub fn snapshot(&self, request_index: u64, to: u64) -> Result<Snapshot> {
-        if let Some(snap) = self.unstable.snapshot.as_ref() {
-            if snap.get_metadata().index >= request_index {
-                return Ok(snap.clone());
-            }
+        if let Some(snap) = self.unstable.snapshot.as_ref()
+            && snap.get_metadata().index >= request_index
+        {
+            return Ok(snap.clone());
         }
         self.store.snapshot(request_index, to)
     }
@@ -1427,10 +1427,10 @@ mod test {
             if from > offset && slice_res.is_err() {
                 panic!("#{}: unexpected error {}", i, slice_res.unwrap_err());
             }
-            if let Ok(ref g) = slice_res {
-                if g != w {
-                    panic!("#{}: from {} to {} = {:?}, want {:?}", i, from, to, g, w);
-                }
+            if let Ok(ref g) = slice_res
+                && g != w
+            {
+                panic!("#{}: from {} to {} = {:?}, want {:?}", i, from, to, g, w);
             }
         }
     }
