@@ -23,7 +23,7 @@ raft = { path = "..", default-features = false }
 raft-proto = { path = "../proto", default-features = false }
 fail = { version = "0.5", optional = true }
 rand = "0.9"
-slog = "2.7"
+slog = "2.8"
 prost = "0.14"
 
 [dev-dependencies]

@@ -32,7 +32,7 @@ prost = "0.14"
 thiserror = "2"
 raft-proto = { path = "proto", version = "0.7.1", default-features = false }
 rand = "0.9"
-slog = "2.7"
+slog = "2.8"
 slog-envlogger = { version = "2.2", optional = true }
 slog-stdlog = { version = "4", optional = true }
 slog-term = { version = "2.9", optional = true }
