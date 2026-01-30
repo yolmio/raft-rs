@@ -1537,6 +1537,17 @@ impl<T: Storage> Raft<T> {
     }
 
     fn hup(&mut self, transfer_leader: bool) {
+        // Nodes with priority=0 should never initiate elections.
+        // These are witness nodes that participate in voting but cannot lead.
+        // Exception: allow explicit leader transfers (transfer_leader=true).
+        if self.priority == 0 && !transfer_leader {
+            debug!(
+                self.logger,
+                "ignoring MsgHup because priority=0 (witness node)";
+            );
+            return;
+        }
+
         if self.state == StateRole::Leader {
             debug!(
                 self.logger,
